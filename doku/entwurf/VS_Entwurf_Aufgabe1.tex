@@ -1,0 +1,86 @@
+\documentclass[a4paper, 12pt]{scrartcl}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[ngerman]{babel}
+
+\usepackage{paralist}
+\usepackage{multicol}
+
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{pifont}
+
+\usepackage{listings}
+\usepackage{color}
+
+\usepackage{enumitem} % used for letters i, ii, iii... in enumerate
+
+\usepackage{graphicx}
+
+%setup
+\author{Jakob Otto\\
+	\texttt{2266015} \and Martin Beckmann\\
+	\texttt{2324916}}
+
+\title{VS-Aufgabe 2\\
+       Entwurf}
+
+% setting locales
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+\usepackage{lmodern}
+\usepackage[locale=DE,list-final-separator={ oder },range-phrase={ bis },scientific-notation=false,group-digits=integer]{siunitx}
+
+% package includes
+\usepackage{xcolor}
+\usepackage{listings}
+
+%listing setup
+\definecolor{pblue}{rgb}{0.13,0.13,1}
+\definecolor{pgreen}{rgb}{0,0.5,0}
+\definecolor{pred}{rgb}{0.9,0,0}
+\definecolor{pgrey}{rgb}{0.46,0.45,0.48}
+\definecolor{javared}{rgb}{0.6,0,0} % for strings
+\definecolor{javagreen}{rgb}{0.25,0.5,0.35} % comments
+\definecolor{javapurple}{rgb}{0.5,0,0.35} % keywords
+\definecolor{javadocblue}{rgb}{0.25,0.35,0.75} % javadoc
+
+\lstset{language=C++,
+	basicstyle=\ttfamily,
+	keywordstyle=\color{javapurple}\bfseries,
+	stringstyle=\color{javared},
+	commentstyle=\color{javagreen},
+	morecomment=[s][\color{javadocblue}]{/**}{*/},
+	numbers=left,
+	numberstyle=\tiny\color{black},
+	stepnumber=2,
+	numbersep=10pt,
+	tabsize=2,
+	showspaces=false,
+	showstringspaces=false
+}
+
+\begin{document}
+\maketitle
+\newpage
+	
+\section{Aufgabe}
+Aufgabe ist es, ein verteiltes System mit dem Aktorenmodell (CAF) zu realisieren. Dieses System soll Primfaktorzerlegung mittels des Pollard-Rho-Verfahrens gewährleisten. Um eine Zahl in ihre Primfaktoren zu zerlegen, soll das System mehrere Aktoren erzeugen, welche kleine Teilaufgaben erledigen. Einzelne Komponenten in dieser Anwendung sollen auf Ausfälle anderer Aktoren tolerant reagieren.
+Die konkreten Aufgaben der einzelnen Komponenten des Systems werden anschließend näher erklärt.
+
+\section{Komponenten}
+\subsection{Client}
+Der Client ist eine simple Kommandozeilenanwendung die nur dazu dient einem Manager eine Zahl zu geben die er faktorisieren lassen soll und das Ergebnis anschließend auf dem Terminal auszugeben.
+
+\subsection{Manager}
+Der Manager ist ein Aktor, welcher die Schnittstelle eines Rechners nach außen darstellt. Er nimmt Aufgaben von Clients entgegen und gibt die Antwort zurück, sobald sein Koordinator die Zahl korrekt faktorisiert hat. Außerdem kann der Manager neue Worker auf dem System erzeugen. Falls der Manager auf dem Rechner keine weiteren Worker erzeugen kann, weil etwa das System bereits seine Ressourcen ausgelastet hat, kann er andere bekannte Manager fragen ob sie auf ihren Rechnern Worker erzeugen. Alle Worker die dem Manager bekannt sind, leitet er an den Koordinator weiter, damit er ihnen Aufgaben zuteilen kann. Somit können einzelne Aufgaben gleichzeitig auf mehreren Rechnern bearbeitet werden. Damit jeder Manager von den Ressourcen aller anderen Manager wissen kann, müssen die Manager alle ihre erzeugten Worker im verteilten System publishen. Somit kann ein Koordinator theoretisch alle Ressourcen des verteilen Systems auf einmal nutzen um an einen Primfakor errechnen zu können. 
+
+\subsection{Koordinator}
+Die Aufgabe des Koordinators ist es, Teilaufgaben an die ihm bekannten Worker zu verteilen. Das sieht so aus, dass mehrere Worker stets parallel "im Wettbewerb" an einem Primfaktor arbeiten. Sobald der erste Worker einen Primfaktor berechnet hat, stoppt der Koordinator erstmal alle anderen Worker, welche gerade an seiner Aufgabe arbeiten. Anschließend teilt der Koordinator seine aktuell zu bearbeitende Zahl durch den errechneten Primfaktor. Dies ist nun die nächste Zahl für die ein Faktor zu berechnen ist. Nun lässt der Koordinator wieder alle Worker an dem neuen Problem arbeiten. Dies passiert solange bis die neue zu berechnende Zahl selbst eine Primzahl ist. Wenn alle Primfaktoren bestimmt wurden, gibt der Koordinator das Ergbenis an den Manager zurück.
+
+\subsection{Worker}
+Die Worker sollen letztendlich den Pollard-Rho-Algorithmus anwenden um einen Primfaktor für eine, vom Koordinator übergebene, Zahl zu errechnen. Da der Algorithmus von rekursiver Natur ist, sollte es auch der Worker sein. Deswegen dürfen Worker weitere temporäre Worker starten, welche die nächste Stufe der Rekursion berechnen. Somit ist das Ergebnis, welches der oberste Worker dem Koordinator zurück gibt immer ein echter Primfaktor und der Koordinator muss entsprechend weniger koordinieren. Diese Worker sollen neben der eigentlichen Aufgabe des Faktorisierens auch noch simple Daten zum Benchmarken wie genutzte CPU Zeit bestimmen und zurück geben.
+
+\end{document}
+
