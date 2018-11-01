@@ -21,7 +21,13 @@ else ()
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 endif ()
 
-find_package(Libcaf COMPONENTS core io REQUIRED)
+if(NOT CAF_ROOT_DIR)
+  set(CAF_ROOT_DIR "/home/otto/vs/actor-framework/build/")
+endif()
+find_package(CAF COMPONENTS core io REQUIRED)
+if (CAF_FOUND)
+  include_directories(${CAF_INCLUDE_DIRS})
+endif ()
 
 # we need this to be able to include headers produced by uic in our code
 # (CMAKE_BINARY_DIR holds a path to the build directory, while INCLUDE_DIRECTORIES() works just like INCLUDEPATH
@@ -34,6 +40,6 @@ set(SOURCES
 file(GLOB HEADERS "include/*.hpp")
 
 add_executable(vslab ${SOURCES} ${HEADERS})
-target_link_libraries(vslab ${CMAKE_DL_LIBS} ${LIBCAF_LIBRARIES})
+target_link_libraries(vslab ${CMAKE_DL_LIBS} ${CAF_LIBRARIES})
 add_dependencies(vslab all_programs)
 
