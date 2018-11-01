@@ -88,20 +88,20 @@ namespace worker {
     int512_t d = 0;
   };
 
-  void rho(stateful_actor<state>* self, int512_t n, actor ret) {
+  void rho(stateful_actor<state>* self, int512_t n, const actor& ret, const int count) {
     if(!self->mailbox().empty()) return;
     auto& state = self->state;
     cout << "got task " << n << endl;
 
     if (n == 1) {
       if(!self->mailbox().empty()) return;
-      self->send(ret, result_atom::value, std::make_pair(n, int512_t("1")), self);
+      self->send(ret, result_atom::value, std::make_pair(n, int512_t("1")), count);
       aout(self) << "sent result n == 1" << endl;
       return;
     }
     if((n%2) == 0) {
       if(!self->mailbox().empty()) return;
-      self->send(ret, result_atom::value, std::make_pair(n, int512_t("2")), self);
+      self->send(ret, result_atom::value, std::make_pair(n, int512_t("2")), count);
       aout(self) << "sent result " << n << " n%2" << endl;
       return;
     }
@@ -121,7 +121,7 @@ namespace worker {
       state.d = gcd(abs(state.x - state.y), state.n);
 
       if (state.d == state.n) {
-        rho(self, state.n, ret);
+        rho(self, state.n, ret, count);
         return ;
       }
 
@@ -129,7 +129,7 @@ namespace worker {
 
       if(state.d != 1) {
         // only send result if it is prime
-        self->send(ret, result_atom::value, std::make_pair(n, state.d), self);
+        self->send(ret, result_atom::value, std::make_pair(n, state.d), count);
         cout << "sent result " << state.d << endl;
         return;
       }
@@ -148,8 +148,8 @@ namespace worker {
     self->state.gen.seed(ss);
 
     return {
-      [=](calc_atom, int512_t n, actor ret) {
-        rho(self, n, ret);
+      [=](calc_atom, int512_t n, actor ret, const int count) {
+        rho(self, n, ret, count);
       },
 
       // ignore handlers
@@ -167,6 +167,7 @@ namespace coordinator {
     std::vector<int512_t> prime_factors;
     actor requester;
     bool running = false;
+    int count = 0;
   };
 
   bool isContained(std::vector<int512_t>& vec, int512_t& value) {
@@ -228,17 +229,19 @@ namespace coordinator {
     return {
       [=](start_calc_atom, actor& requester, int512_t n) {
         self->state.running = true;
+        self->state.count = 0;
         self->state.prime_factors.clear();
         self->state.problem_parts.clear();
         self->state.number = n;
         self->state.requester = requester;
         self->state.problem_parts.insert(n);
         for(auto& w : self->state.workers) {
-          self->send(w, calc_atom::value, n, self);
+          self->send(w, calc_atom::value, n, self, self->state.count);
         }
       },
-      [=](result_atom res_atom, std::pair<int512_t, int512_t>& res, actor sender){
-        if(!self->state.running) return;
+      [=](result_atom res_atom, std::pair<int512_t, int512_t>& res, const int count){
+        if(!self->state.running || count != self->state.count) return;
+        ++self->state.count;
         auto& task = res.first;
         auto& factor = res.second;
         auto& problem_parts = self->state.problem_parts;
@@ -263,7 +266,9 @@ namespace coordinator {
           }
         }
         else {
-          self->send(sender, calc_atom::value, *problem_parts.begin(), self);
+          for (auto& w : self->state.workers) {
+            self->send(w, calc_atom::value, *problem_parts.begin(), self, self->state.count);
+          }
         }
       },
       [=](new_actor_atom, std::vector<actor>& workers) {
@@ -272,11 +277,11 @@ namespace coordinator {
           // TODO server segfaults on downhandler // self->monitor(w);
           // start new actors with task
           if (!self->state.problem_parts.empty()) {
-            self->send(w, calc_atom::value, *self->state.problem_parts.begin(), self);
+            self->send(w, calc_atom::value, *self->state.problem_parts.begin(), self, self->state.count);
           }
         }
       },
-      [](calc_atom, int512_t, actor) {/*ignore*/},
+      [](calc_atom, int512_t, const int) {/*ignore*/},
       [](quit_atom) {/*ignore*/}
     };
   }
